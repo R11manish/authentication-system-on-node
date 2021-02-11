@@ -1,9 +1,20 @@
 const User = require("../models/User");
+const jwt = require('jsonwebtoken');
 
 //handle error 
 const handleErrors = (err) => {
   console.log(err.message , err.code );
   let errors = {email : '' , password : ''};
+
+  //incorrect email
+  if (err.message === 'incorrect email'){
+    errors.email = 'that email is not registered';
+  }
+
+  if(err.message === 'incorrect password') {
+    errors.password = 'that password is incorrect'
+  }
+
   if(err.code === 11000){
     errors.email = "duplicate email address please try with another gmail address"
     return errors
@@ -16,6 +27,13 @@ const handleErrors = (err) => {
     })
   }
   return errors
+}
+
+const maxAge = 3*24*60*60;
+const createToken = (id) =>{
+  return jwt.sign({id},'hello-buddies',{
+    expiresIn : maxAge
+  });
 }
 
 // controller actions
@@ -32,7 +50,9 @@ module.exports.signup_post = async (req, res) => {
 
   try {
     const user = await User.create({ email, password });
-    res.status(201).json(user);
+    const token = createToken(user._id);
+    res.cookie('jwt',token , {httpOnly : true , maxAge : maxAge*1000})
+    res.status(201).json({user : user._id});
   }
   catch(err) {
     const errors = handleErrors(err)
@@ -43,7 +63,14 @@ module.exports.signup_post = async (req, res) => {
 
 module.exports.login_post = async (req, res) => {
   const { email, password } = req.body;
+  try {
+    const user = await User.login(email , password);
+    const token = createToken(user._id);
+    res.cookie('jwt',token , {httpOnly : true , maxAge : maxAge*1000})
+    res.status(200).json({user : user._id})
+  } catch (err){
+    const errors = handleErrors(err)
+    res.status(400).json({errors});
+  }
 
-  console.log(email, password);
-  res.send('user login');
 }
